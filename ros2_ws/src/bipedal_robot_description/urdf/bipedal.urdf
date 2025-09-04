@@ -1,0 +1,310 @@
+<?xml version="1.0"?>
+<!-- ros2_ws/src/bipedal_robot_description/urdf/bipedal_robot.urdf -->
+<robot name="bipedal_robot">
+
+  <!-- Materials -->
+  <material name="blue">
+    <color rgba="0.2 0.2 0.8 1.0"/>
+  </material>
+  
+  <material name="red">
+    <color rgba="0.8 0.2 0.2 1.0"/>
+  </material>
+  
+  <material name="green">
+    <color rgba="0.2 0.8 0.2 1.0"/>
+  </material>
+  
+  <material name="grey">
+    <color rgba="0.5 0.5 0.5 1.0"/>
+  </material>
+
+  <!-- Base Link (Torso) -->
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <box size="0.3 0.2 0.6"/>
+      </geometry>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <material name="blue"/>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.3 0.2 0.6"/>
+      </geometry>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </collision>
+    <inertial>
+      <mass value="10.0"/>
+      <origin xyz="0 0 0"/>
+      <inertia ixx="0.83" ixy="0" ixz="0" iyy="1.08" iyz="0" izz="0.33"/>
+    </inertial>
+  </link>
+
+  <!-- Left Hip Joint -->
+  <joint name="left_hip_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="left_thigh"/>
+    <origin xyz="-0.05 0.1 -0.3" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.57" upper="1.57" effort="150" velocity="10"/>
+    <dynamics damping="0.1" friction="0.1"/>
+  </joint>
+
+  <!-- Left Thigh -->
+  <link name="left_thigh">
+    <visual>
+      <geometry>
+        <box size="0.1 0.08 0.4"/>
+      </geometry>
+      <origin xyz="0 0 -0.2" rpy="0 0 0"/>
+      <material name="red"/>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.1 0.08 0.4"/>
+      </geometry>
+      <origin xyz="0 0 -0.2" rpy="0 0 0"/>
+    </collision>
+    <inertial>
+      <mass value="2.0"/>
+      <origin xyz="0 0 -0.2"/>
+      <inertia ixx="0.027" ixy="0" ixz="0" iyy="0.027" iyz="0" izz="0.003"/>
+    </inertial>
+  </link>
+
+  <!-- Left Knee Joint -->
+  <joint name="left_knee_joint" type="revolute">
+    <parent link="left_thigh"/>
+    <child link="left_shin"/>
+    <origin xyz="0 0 -0.4" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-2.0" upper="0" effort="100" velocity="10"/>
+    <dynamics damping="0.1" friction="0.1"/>
+  </joint>
+
+  <!-- Left Shin -->
+  <link name="left_shin">
+    <visual>
+      <geometry>
+        <box size="0.08 0.06 0.35"/>
+      </geometry>
+      <origin xyz="0 0 -0.175" rpy="0 0 0"/>
+      <material name="green"/>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.08 0.06 0.35"/>
+      </geometry>
+      <origin xyz="0 0 -0.175" rpy="0 0 0"/>
+    </collision>
+    <inertial>
+      <mass value="1.5"/>
+      <origin xyz="0 0 -0.175"/>
+      <inertia ixx="0.015" ixy="0" ixz="0" iyy="0.015" iyz="0" izz="0.001"/>
+    </inertial>
+  </link>
+
+  <!-- Left Ankle Joint -->
+  <joint name="left_ankle_joint" type="revolute">
+    <parent link="left_shin"/>
+    <child link="left_foot"/>
+    <origin xyz="0 0 -0.35" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-0.5" upper="0.5" effort="50" velocity="10"/>
+    <dynamics damping="0.1" friction="0.1"/>
+  </joint>
+
+  <!-- Left Foot -->
+  <link name="left_foot">
+    <visual>
+      <geometry>
+        <box size="0.15 0.08 0.04"/>
+      </geometry>
+      <origin xyz="0.05 0 -0.02" rpy="0 0 0"/>
+      <material name="grey"/>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.15 0.08 0.04"/>
+      </geometry>
+      <origin xyz="0.05 0 -0.02" rpy="0 0 0"/>
+    </collision>
+    <inertial>
+      <mass value="0.5"/>
+      <origin xyz="0.05 0 -0.02"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.002" iyz="0" izz="0.001"/>
+    </inertial>
+  </link>
+
+  <!-- Right Hip Joint -->
+  <joint name="right_hip_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="right_thigh"/>
+    <origin xyz="-0.05 -0.1 -0.3" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.57" upper="1.57" effort="150" velocity="10"/>
+    <dynamics damping="0.1" friction="0.1"/>
+  </joint>
+
+  <!-- Right Thigh -->
+  <link name="right_thigh">
+    <visual>
+      <geometry>
+        <box size="0.1 0.08 0.4"/>
+      </geometry>
+      <origin xyz="0 0 -0.2" rpy="0 0 0"/>
+      <material name="red"/>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.1 0.08 0.4"/>
+      </geometry>
+      <origin xyz="0 0 -0.2" rpy="0 0 0"/>
+    </collision>
+    <inertial>
+      <mass value="2.0"/>
+      <origin xyz="0 0 -0.2"/>
+      <inertia ixx="0.027" ixy="0" ixz="0" iyy="0.027" iyz="0" izz="0.003"/>
+    </inertial>
+  </link>
+
+  <!-- Right Knee Joint -->
+  <joint name="right_knee_joint" type="revolute">
+    <parent link="right_thigh"/>
+    <child link="right_shin"/>
+    <origin xyz="0 0 -0.4" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-2.0" upper="0" effort="100" velocity="10"/>
+    <dynamics damping="0.1" friction="0.1"/>
+  </joint>
+
+  <!-- Right Shin -->
+  <link name="right_shin">
+    <visual>
+      <geometry>
+        <box size="0.08 0.06 0.35"/>
+      </geometry>
+      <origin xyz="0 0 -0.175" rpy="0 0 0"/>
+      <material name="green"/>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.08 0.06 0.35"/>
+      </geometry>
+      <origin xyz="0 0 -0.175" rpy="0 0 0"/>
+    </collision>
+    <inertial>
+      <mass value="1.5"/>
+      <origin xyz="0 0 -0.175"/>
+      <inertia ixx="0.015" ixy="0" ixz="0" iyy="0.015" iyz="0" izz="0.001"/>
+    </inertial>
+  </link>
+
+  <!-- Right Ankle Joint -->
+  <joint name="right_ankle_joint" type="revolute">
+    <parent link="right_shin"/>
+    <child link="right_foot"/>
+    <origin xyz="0 0 -0.35" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-0.5" upper="0.5" effort="50" velocity="10"/>
+    <dynamics damping="0.1" friction="0.1"/>
+  </joint>
+
+  <!-- Right Foot -->
+  <link name="right_foot">
+    <visual>
+      <geometry>
+        <box size="0.15 0.08 0.04"/>
+      </geometry>
+      <origin xyz="0.05 0 -0.02" rpy="0 0 0"/>
+      <material name="grey"/>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.15 0.08 0.04"/>
+      </geometry>
+      <origin xyz="0.05 0 -0.02" rpy="0 0 0"/>
+    </collision>
+    <inertial>
+      <mass value="0.5"/>
+      <origin xyz="0.05 0 -0.02"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.002" iyz="0" izz="0.001"/>
+    </inertial>
+  </link>
+
+  <!-- Gazebo Plugins -->
+  <gazebo>
+    <plugin name="gazebo_ros_control" filename="libgazebo_ros_control.so">
+      <robotNamespace>/bipedal_robot</robotNamespace>
+    </plugin>
+  </gazebo>
+
+  <!-- Joint Transmissions for ros_control -->
+  <transmission name="left_hip_transmission">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="left_hip_joint">
+      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="left_hip_motor">
+      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
+  <transmission name="left_knee_transmission">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="left_knee_joint">
+      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="left_knee_motor">
+      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
+  <transmission name="left_ankle_transmission">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="left_ankle_joint">
+      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="left_ankle_motor">
+      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
+  <transmission name="right_hip_transmission">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="right_hip_joint">
+      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="right_hip_motor">
+      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
+  <transmission name="right_knee_transmission">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="right_knee_joint">
+      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="right_knee_motor">
+      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
+  <transmission name="right_ankle_transmission">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="right_ankle_joint">
+      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="right_ankle_motor">
+      <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+
+</robot>
