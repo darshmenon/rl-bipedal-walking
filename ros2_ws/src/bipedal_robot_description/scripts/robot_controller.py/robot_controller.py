@@ -517,4 +517,3 @@ class TrainingVisualizer:
             print(f"Hyperparameter comparison saved to {save_path}")
         
         return fig
-        
