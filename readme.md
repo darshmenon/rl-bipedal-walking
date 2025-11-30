@@ -1,5 +1,7 @@
 # RL Bipedal Humanoid Robot
 
+![Gazebo Visualization](images/demo.png)
+
 A complete reinforcement learning (RL) framework for training a bipedal humanoid robot to walk using **ROS 2**, **Gazebo Sim (gz)**, and **PyTorch (PPO)**.
 
 This project combines **robot simulation** with **deep reinforcement learning**, enabling training, evaluation, and visualization of walking behaviors for a custom bipedal humanoid robot.
@@ -14,6 +16,7 @@ This project combines **robot simulation** with **deep reinforcement learning**,
 ## Project Structure
 
 ```
+
 rl-bipedal-walking/
 ├── ros2_ws/                          # ROS2 workspace
 │   └── src/
@@ -32,12 +35,13 @@ rl-bipedal-walking/
 │       ├── evaluation/               # Evaluation tools
 │       ├── visualization/            # Plotting utilities
 │       ├── models/                   # Saved trained models
-│       └── __init__.py
+│       └── **init**.py
 ├── scripts/                          # Helper bash scripts
 ├── requirements.txt
 ├── setup.py
 └── README.md
-```
+
+````
 
 ---
 
@@ -58,7 +62,7 @@ source venv/bin/activate
 
 # Install Python dependencies
 pip install -r requirements.txt
-```
+````
 
 ### 2. Build ROS2 Packages
 
@@ -249,20 +253,23 @@ python src/rl_bipedal_walking/evaluation/evaluate_model.py \
 ## Current Status & Known Issues
 
 ### ✅ Working
-- ROS 2 Jazzy workspace builds successfully
-- Gazebo Sim (gz 8.9.0) launches with bipedal humanoid robot
-- Robot URDF is valid and spawns correctly
-- ROS-GZ bridge is configured and running
-- Project structure and scripts are in place
+
+* ROS 2 Jazzy workspace builds successfully
+* Gazebo Sim (gz 8.9.0) launches with bipedal humanoid robot
+* Robot URDF is valid and spawns correctly
+* ROS-GZ bridge is configured and running
+* Project structure and scripts are in place
 
 ### ⚠️ In Progress
-- **RL Environment Migration**: The `bipedal_env.py` currently uses legacy `gazebo_msgs` (for old Gazebo). Needs to be updated to use `gz_msgs` for Gazebo Sim compatibility.
-- **ROS-GZ Topic Mapping**: Joint state and odometry topics need proper bridge configuration
-- **Training Pipeline**: Once environment is updated, training will work as designed
+
+* **RL Environment Migration**: The `bipedal_env.py` currently uses legacy `gazebo_msgs` (for old Gazebo). Needs to be updated to use `gz_msgs` for Gazebo Sim compatibility.
+* **ROS-GZ Topic Mapping**: Joint state and odometry topics need proper bridge configuration
+* **Training Pipeline**: Once environment is updated, training will work as designed
 
 ### 🔧 Quick Fixes Needed
 
 1. **Update environment to Gazebo Sim**:
+
    ```python
    # Replace in bipedal_env.py:
    from gazebo_msgs.srv import GetModelState  # OLD
@@ -270,6 +277,7 @@ python src/rl_bipedal_walking/evaluation/evaluate_model.py \
    ```
 
 2. **Install missing Python dependencies**:
+
    ```bash
    source venv/bin/activate
    pip install pyyaml typeguard
@@ -315,51 +323,45 @@ python src/rl_bipedal_walking/evaluation/evaluate_model.py \
 Watch the trained bipedal robot walking in Gazebo simulation:
 
 **Training Progress:**
-- Episodes trained: 1000
-- Best episode reward: 245.67
-- Average walking distance: 12.5 meters
-- Success rate: 78%
+
+* Episodes trained: 1000
+* Best episode reward: 245.67
+* Average walking distance: 12.5 meters
+* Success rate: 78%
 
 ### Expected Results
 
 After training for ~1000 episodes, you should see:
 
 1. **Training Curves:**
-   - Episode rewards increasing from ~-50 to 200+
-   - Episode lengths improving from 100 to 800+ steps
-   - Policy loss converging to stable values
+
+   * Episode rewards increasing from ~-50 to 200+
+   * Episode lengths improving from 100 to 800+ steps
+   * Policy loss converging to stable values
 
 2. **Robot Behavior:**
-   - Initial episodes: Robot falls immediately
-   - Mid-training (ep 200-500): Robot learns to balance
-   - Late training (ep 500+): Smooth forward walking motion
+
+   * Initial episodes: Robot falls immediately
+   * Mid-training (ep 200-500): Robot learns to balance
+   * Late training (ep 500+): Smooth forward walking motion
 
 3. **Performance Metrics:**
-   - Forward velocity: ~0.4-0.5 m/s (target: 0.5 m/s)
-   - Stability: Roll/pitch within ±0.3 radians
-   - Average episode length: 600-800 steps
 
-### Screenshots
-
-To capture your own demo:
-
-```bash
-# While Gazebo is running, take screenshots
-# Or record video with:
-recordmydesktop --no-sound --delay 5
-
-# Stop recording with Ctrl+C
-# Video saved as out.ogv
-```
+   * Forward velocity: ~0.4-0.5 m/s (target: 0.5 m/s)
+   * Stability: Roll/pitch within ±0.3 radians
+   * Average episode length: 600-800 steps
 
 ### Trained Models
 
 Trained models are saved in `training_results_<timestamp>/models/`:
-- `best_model.pth` - Best performing model
-- `model_episode_<N>.pth` - Checkpoints every 50 episodes
+
+* `best_model.pth` - Best performing model
+* `model_episode_<N>.pth` - Checkpoints every 50 episodes
 
 ---
 
 ## License
 
 MIT License – free to use, modify, and distribute.
+
+```
