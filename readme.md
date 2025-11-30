@@ -110,10 +110,17 @@ python src/rl_bipedal_walking/evaluation/evaluate_model.py \
 
 ### Robot Simulation
 
-* 6-DOF bipedal robot (hip, knee, ankle per leg)
-* Gazebo physics with collision dynamics
-* ROS2 integration for messaging and control
-* RViz for visualization
+* **Complete Humanoid Design**:
+  * Head with spherical geometry
+  * Torso (base link) with improved proportions
+  * Full arms with shoulders, elbows, and hands
+  * Articulated legs with hips, knees, and ankles
+  * Total of 6 active DOF for locomotion training
+* **Realistic Materials**: Skin-tone limbs, blue torso, white shoes
+* **Improved Physics**: Higher damping and friction for stable standing pose
+* Gazebo Sim (gz 8.9.0) integration with ROS-GZ bridge
+* ROS 2 integration for messaging and control
+* Spawns at 1.5m height for proper initial positioning
 
 ### Reinforcement Learning
 
