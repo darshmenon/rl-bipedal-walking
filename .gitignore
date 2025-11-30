@@ -1,36 +1,22 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-*.egg
-*.egg-info/
-dist/
-build/
-*.coverage
-.pytest_cache/
-
-# Virtual environments
-venv/
-env/
-ENV/
-
-# ROS
+# ROS2 build artifacts
 build/
 install/
 log/
+*.log
+
+# Python
+__pycache__/
 *.pyc
+venv/
+.pytest_cache/
+.coverage
 
 # IDE
 .vscode/
 .idea/
-*.swp
-*.swo
 
-# Training results
+# Project specific
 training_results_*/
 *.pth
-
-# System
-.DS_Store
-*.log
+*.png
+*.ogv
