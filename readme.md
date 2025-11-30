@@ -86,7 +86,18 @@ cd ..
 # - Bridge ROS 2 topics with Gazebo Sim
 ```
 
-### 4. Start Training (Current Status: In Development)
+### 4. Visualize in RViz (Optional)
+
+```bash
+# Terminal 2 - Launch RViz to visualize robot model
+source ros2_ws/install/setup.bash
+rviz2 -d ros2_ws/src/bipedal_robot_description/config/rviz_config.rviz
+
+# Or use the launch file:
+ros2 launch bipedal_robot_description rviz_display.launch.py
+```
+
+### 5. Start Training (Current Status: In Development)
 
 ```bash
 # Terminal 2 - Start RL training (make sure Gazebo Sim is running)
