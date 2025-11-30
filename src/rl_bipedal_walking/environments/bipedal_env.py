@@ -2,7 +2,6 @@
 import gym
 from gym import spaces
 import numpy as np
-import rospy
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import JointState

@@ -24,7 +24,7 @@ def generate_launch_description():
 
     z_pos_arg = DeclareLaunchArgument(
         'z_pos',
-        default_value='1.0',
+        default_value='1.5',
         description='Z position of the robot'
     )
 
