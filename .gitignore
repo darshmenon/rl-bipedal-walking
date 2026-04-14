@@ -7,6 +7,9 @@ log/
 # Python
 __pycache__/
 *.pyc
+*.pyo
+*.egg-info/
+dist/
 venv/
 .pytest_cache/
 .coverage
@@ -14,9 +17,15 @@ venv/
 # IDE
 .vscode/
 .idea/
+*.swp
+*.swo
 
-# Project specific
+# Training artifacts
 training_results_*/
 *.pth
-*.png
 *.ogv
+videos/
+
+# OS
+.DS_Store
+Thumbs.db

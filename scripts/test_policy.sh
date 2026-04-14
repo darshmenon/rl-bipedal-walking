@@ -8,7 +8,7 @@ source /home/darsh/rl-bipedal-walking/venv/bin/activate
 export PYTHONPATH="/home/darsh/rl-bipedal-walking/src:$PYTHONPATH"
 
 # Source ROS2
-source /opt/ros/jazzy/setup.bash
+source /opt/ros/humble/setup.bash
 source /home/darsh/rl-bipedal-walking/ros2_ws/install/setup.bash
 
 # Find the latest training results directory

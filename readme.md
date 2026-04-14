@@ -1,17 +1,17 @@
-# Humanoid Robot Reinforcement Learning
+# Humanoid RL — Bipedal Locomotion with Sim-to-Real Transfer
 
-A full-stack humanoid robot RL framework — from fast simulation training in Isaac Gym to MuJoCo sim-to-sim validation and ROS 2 deployment. Covers locomotion policy learning, zero-shot sim-to-real transfer, and hardware-ready deployment pipelines.
+A reinforcement learning framework for training bipedal humanoid robots to walk, combining **MuJoCo** simulation with **ROS 2 Humble** deployment pipelines. Trained policies transfer from simulation to real hardware via domain randomization and system identification.
 
 ---
 
 ## Overview
 
-This project implements reinforcement learning for humanoid robot locomotion with a focus on real-world transfer. The pipeline covers:
+This project implements end-to-end reinforcement learning for humanoid locomotion:
 
-- **Training** — Fast policy learning in NVIDIA Isaac Gym (GPU-accelerated, parallel envs)
-- **Sim-to-Sim Validation** — Transfer trained policies to MuJoCo for physics verification before hardware
-- **Sim-to-Real Transfer** — Domain randomization, actuator modeling, and system identification
-- **ROS 2 Deployment** — Integration with Gazebo Sim and real robot control stacks
+- **Training** — PPO-based policy learning with parallel environments and reward shaping for stable bipedal walking
+- **Sim-to-Sim Validation** — Transfer trained policies to MuJoCo for physics cross-validation before hardware deployment
+- **Sim-to-Real Transfer** — Domain randomization, actuator modeling, and system identification for zero-shot transfer
+- **ROS 2 Deployment** — Integration with Gazebo Sim and real robot control stacks via ROS 2 Humble
 
 ---
 
@@ -19,34 +19,36 @@ This project implements reinforcement learning for humanoid robot locomotion wit
 
 ```
 rl-bipedal-walking/
-├── humanoid/                         # Isaac Gym RL training package
+├── humanoid/                         # RL training package
 │   ├── envs/
 │   │   ├── base/                     # Base legged robot environment
 │   │   └── custom/
-│   │       ├── humanoid_env.py       # Humanoid-specific env (rewards, obs, sim2real)
+│   │       ├── humanoid_env.py       # Humanoid env (rewards, obs, domain rand)
 │   │       └── humanoid_config.py    # Training & environment hyperparameters
 │   ├── scripts/
-│   │   ├── train.py                  # Launch Isaac Gym training
-│   │   ├── play.py                   # Visualize trained policy
-│   │   └── sim2sim.py                # Transfer policy Isaac → MuJoCo
+│   │   ├── train.py                  # Launch RL training
+│   │   ├── play.py                   # Visualize & export trained policy
+│   │   └── sim2sim.py                # MuJoCo sim-to-sim validation
 │   ├── algo/                         # PPO implementation
-│   └── utils/                        # Logging, terrain, helpers
+│   └── utils/                        # Logging, terrain, task registry
 ├── resources/
 │   └── robots/
-│       └── XBot/                     # Humanoid robot URDF + meshes
-├── ros2_ws/                          # ROS 2 workspace
+│       └── XBot/                     # Humanoid URDF, MJCF, meshes
+│           ├── urdf/                 # URDF robot description
+│           └── mjcf/                 # MuJoCo XML models
+├── ros2_ws/                          # ROS 2 Humble workspace
 │   └── src/
 │       └── bipedal_robot_description/
 │           ├── urdf/                 # Robot description
 │           ├── launch/               # Gazebo Sim launch files
 │           └── config/               # RViz configs
-├── src/                              # Custom Gym environments
+├── src/                              # Additional Gym environments
 │   └── rl_bipedal_walking/
-│       ├── environments/             # Gymnasium-compatible env wrappers
+│       ├── environments/             # Gymnasium-compatible wrappers
 │       ├── agents/                   # PPO / SAC agents
 │       └── training/                 # Training scripts
 ├── scripts/                          # Shell helper scripts
-├── logs/                             # Training run logs
+├── logs/                             # Training run logs & exported policies
 ├── setup.py                          # Package install
 └── requirements.txt
 ```
@@ -57,11 +59,11 @@ rl-bipedal-walking/
 
 ### 1. Prerequisites
 
-- Ubuntu 22.04 / 24.04
+- Ubuntu 22.04
 - Python 3.8+
-- NVIDIA GPU with CUDA 11.x+ (for Isaac Gym)
-- [Isaac Gym Preview 4](https://developer.nvidia.com/isaac-gym)
-- ROS 2 Jazzy (for deployment)
+- NVIDIA GPU with CUDA 11.x+
+- ROS 2 Humble
+- MuJoCo 2.3.6+
 
 ### 2. Installation
 
@@ -69,10 +71,14 @@ rl-bipedal-walking/
 git clone https://github.com/darshmenon/rl-bipedal-walking
 cd rl-bipedal-walking
 
-# Install Isaac Gym (download preview4 from NVIDIA, then):
-pip install -e isaacgym/python
+# Create virtual environment
+conda create -n humanoid-rl python=3.8
+conda activate humanoid-rl
 
-# Install this package
+# Install PyTorch with CUDA
+conda install pytorch==1.13.1 torchvision==0.14.1 torchaudio==0.13.1 pytorch-cuda=11.7 -c pytorch -c nvidia
+
+# Install the package
 pip install -e .
 pip install -r requirements.txt
 ```
@@ -80,182 +86,204 @@ pip install -r requirements.txt
 ### 3. Train a Locomotion Policy
 
 ```bash
-python humanoid/scripts/train.py --task humanoid_ppo
+# PPO training with 4096 parallel environments
+python humanoid/scripts/train.py --task humanoid_ppo --run_name v1 --headless --num_envs 4096
 ```
 
-Training runs in Isaac Gym with 4096 parallel environments. Policy checkpoints are saved to `logs/`.
+Training runs with parallel environments. Policy checkpoints are saved to `logs/`.
 
-### 4. Visualize the Policy
+### 4. Visualize & Export the Policy
 
 ```bash
-python humanoid/scripts/play.py --task humanoid_ppo --load_run <run_name>
+# Load trained policy and export JIT model
+python humanoid/scripts/play.py --task humanoid_ppo --run_name v1
 ```
+
+This exports a JIT-compiled policy to `logs/<experiment>/exported/policies/` for deployment.
 
 ### 5. Sim-to-Sim: Transfer to MuJoCo
 
 ```bash
-python humanoid/scripts/sim2sim.py --load_model logs/<run_name>/model_<iter>.pt
+# Run trained policy in MuJoCo for validation
+python humanoid/scripts/sim2sim.py --load_model logs/XBot_ppo/exported/policies/policy_1.pt
+
+# With terrain
+python humanoid/scripts/sim2sim.py --load_model logs/XBot_ppo/exported/policies/policy_1.pt --terrain
 ```
 
-Validates the trained policy in MuJoCo before deploying to hardware.
+Validates the trained policy under MuJoCo physics before deploying to hardware.
 
 ### 6. ROS 2 + Gazebo Sim
 
 ```bash
 # Build ROS 2 workspace
 cd ros2_ws
-source /opt/ros/jazzy/setup.bash
+source /opt/ros/humble/setup.bash
 colcon build --symlink-install
 source install/setup.bash
 
 # Launch Gazebo Sim with humanoid robot
-ros2 launch bipedal_robot_description gazebo.launch.py
+ros2 launch bipedal_robot_description spawn_robot.launch.py
 ```
 
 ---
 
-## Training Pipeline
-
-### Isaac Gym (Primary Training)
-
-- **4096 parallel environments** for fast wall-clock convergence
-- **PPO** with clipped surrogate objective
-- **Reward shaping** for locomotion:
-  - Forward velocity tracking
-  - Base stability (roll/pitch penalty)
-  - Foot clearance and contact timing
-  - Torque and energy minimization
-  - Alive bonus
-
-### Sim-to-Real Transfer Techniques
-
-| Technique | Description |
-|---|---|
-| Domain Randomization | Randomizes mass, friction, motor gains, external pushes |
-| Actuator Modeling | PD controller with delay and torque limits matching hardware |
-| Observation Noise | Gaussian noise added to simulated sensor readings |
-| System Identification | Physics parameters tuned against real hardware measurements |
-
-### MuJoCo Sim-to-Sim
-
-The `sim2sim.py` script exports the trained Isaac Gym policy and runs it in MuJoCo to:
-1. Verify behavior under different physics assumptions
-2. Catch policy brittleness before real deployment
-3. Profile controller frequency and latency
-
----
-
-## RL Configuration
-
-Key parameters in `humanoid/envs/custom/humanoid_config.py`:
-
-```python
-# Training
-num_envs = 4096
-max_iterations = 3000
-num_steps_per_env = 24
-
-# PPO
-learning_rate = 1e-4
-num_mini_batches = 4
-num_learning_epochs = 5
-clip_param = 0.2
-gamma = 0.99
-lam = 0.95
-entropy_coef = 0.01
-
-# Domain Randomization
-randomize_friction = True        # [0.1, 3.0]
-randomize_base_mass = True       # [-1.0, 3.0] kg
-push_robots = True               # random pushes during training
-push_interval_s = 15
-```
-
----
-
-## Algorithms
+## RL Algorithm
 
 ### PPO (Proximal Policy Optimization)
-Default algorithm for fast, stable locomotion training. Actor-critic with shared MLP backbone.
 
-- **Policy network**: 3-layer MLP, 512 hidden units, ELU activation
-- **Value network**: Separate head on shared trunk
-- **Observation**: 47D — joint positions/velocities, base orientation, base angular velocity, commands, previous actions
-- **Action**: 12D continuous joint position targets (PD-controlled)
+The primary training algorithm uses an actor-critic architecture with the following specs:
 
-### SAC (Soft Actor-Critic)
-Available in `src/rl_bipedal_walking/agents/` for off-policy training with Gymnasium environments. Better sample efficiency for fine-grained manipulation tasks.
+| Parameter | Value |
+|---|---|
+| Policy Network | 3-layer MLP [512, 256, 128], ELU |
+| Observation Space | 47D × 15 frames = 705D |
+| Action Space | 12D continuous joint position targets |
+| Learning Rate | 1e-5 |
+| Discount (γ) | 0.994 |
+| GAE (λ) | 0.9 |
+| Clip Ratio | 0.2 |
+| Entropy Coef | 0.001 |
+| Parallel Envs | 4096 |
+| Max Iterations | 3000 |
+
+### Reward Function
+
+The reward is a weighted sum of locomotion objectives:
+
+- **Velocity tracking** — Forward/lateral/angular velocity command following
+- **Gait phase** — Foot contact timing aligned to reference sinusoidal gait
+- **Joint position tracking** — Penalize deviation from reference motion
+- **Stability** — Base orientation, height, and acceleration penalties
+- **Feet clearance** — Swing leg lift during gait cycle
+- **Energy efficiency** — Torque, joint velocity, and action smoothness penalties
+- **Collision** — Penalize undesired body contacts
+
+### Domain Randomization
+
+Applied during training for robust sim-to-real transfer:
+
+- Friction: [0.1, 2.0]
+- Base mass: [-5.0, +5.0] kg
+- Random pushes every 4s (linear + angular)
+- Action delay and noise injection
 
 ---
 
 ## Robot Model
 
-Default robot: **XBot-L** (1.65m humanoid) — 12 DOF leg joints, 7 DOF arms.
+**Default:** XBot-L — a 1.65m humanoid with 12 DOF legs.
 
-Additional models from [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie) can be dropped into `resources/robots/` with a matching config.
+| Joint Group | DOF | PD Gains (Kp/Kd) |
+|---|---|---|
+| Hip Roll | 2 | 200 / 10 |
+| Hip Yaw | 2 | 200 / 10 |
+| Hip Pitch | 2 | 350 / 10 |
+| Knee | 2 | 350 / 10 |
+| Ankle Pitch | 2 | 15 / 10 |
+| Ankle Roll | 2 | 15 / 10 |
+
+Robot assets live in `resources/robots/XBot/` with both URDF and MJCF descriptions.
+
+---
+
+## Sim-to-Sim Pipeline
+
+The `sim2sim.py` script enables zero-shot policy transfer between simulators:
+
+1. Train in parallel simulation → export JIT policy
+2. Load policy in MuJoCo with matched robot model
+3. Run PD control loop at 1000 Hz (policy at 100 Hz via decimation)
+4. Verify walking behavior, contact forces, and stability
+
+This catches policy brittleness and physics mismatches before real hardware deployment.
 
 ---
 
 ## ROS 2 Integration
 
-The `ros2_ws` provides:
+The `ros2_ws` provides deployment infrastructure on ROS 2 Humble:
+
 - **URDF/SDF** humanoid robot description
-- **Gazebo Sim (gz)** launch files with ROS-GZ bridge
-- **Joint state publisher** and **robot_state_publisher**
+- **Gazebo Sim** launch files with ROS-GZ bridge
+- **Joint state publisher** and `robot_state_publisher`
 - **RViz** visualization config
-- Scaffolding for policy inference node (bridge from trained model → joint torque commands)
+- Scaffolding for **policy inference node** (trained model → joint torque commands)
 
 ```bash
-# ROS 2 topics
-/joint_states            # sensor_msgs/JointState
-/odom                    # nav_msgs/Odometry
-/cmd_vel                 # geometry_msgs/Twist
+# Key ROS 2 topics
+/joint_states          # sensor_msgs/JointState
+/odom                  # nav_msgs/Odometry
+/cmd_vel               # geometry_msgs/Twist
 ```
 
 ---
 
-## Results
+## Adding a New Robot
 
-![Demo](images/demo.gif)
+1. Add URDF and MJCF assets to `resources/robots/<your_robot>/`
+2. Create a config in `humanoid/envs/custom/` inheriting from `LeggedRobotCfg`
+3. Set asset path, body names, default joint angles, and PD gains
+4. Register the task in `humanoid/envs/__init__.py`
+5. Update `sim2sim.py` joint mapping if needed
 
-| Metric | Value |
+---
+
+## Training Tips
+
+- **Headless mode**: Use `--headless` for faster training without rendering
+- **GPU selection**: `--sim_device=cuda:0 --rl_device=0`
+- **Resume training**: Set `resume=True` and `load_run` in config
+- **Terrain curriculum**: Enable `mesh_type='trimesh'` in config for rough terrain training
+- **Monitoring**: Training logs are compatible with TensorBoard and Weights & Biases
+
+---
+
+## Key Hyperparameters
+
+Located in `humanoid/envs/custom/humanoid_config.py`:
+
+```python
+# Training
+num_envs = 4096
+max_iterations = 3000
+episode_length_s = 24
+
+# Domain Randomization
+randomize_friction = True       # [0.1, 2.0]
+randomize_base_mass = True      # [-5, +5] kg
+push_robots = True              # random impulses
+action_delay = 0.5              # simulate actuator lag
+action_noise = 0.02             # observation noise
+
+# Control
+action_scale = 0.25
+decimation = 10                 # 1000Hz sim → 100Hz policy
+```
+
+---
+
+## Troubleshooting
+
+| Issue | Solution |
 |---|---|
-| Training environment | Isaac Gym, 4096 envs |
-| Wall-clock convergence | ~2 hours (RTX 3090) |
-| MuJoCo sim-to-sim transfer | Zero-shot |
-| Target forward velocity | 0.5 m/s |
-| Walking stability | Roll/pitch < ±0.3 rad |
-
----
-
-## Requirements
-
-```
-isaacgym>=preview4
-torch>=1.13
-mujoco==2.3.6
-mujoco-python-viewer
-gymnasium
-stable-baselines3
-numpy==1.23.5
-wandb
-tensorboard
-opencv-python
-matplotlib
-tqdm
-```
+| `libpython3.8.so` not found | `export LD_LIBRARY_PATH="~/conda/envs/humanoid-rl/lib:$LD_LIBRARY_PATH"` |
+| `AttributeError: module 'distutils'` | Install PyTorch 1.12+ with matching CUDA |
+| `libstdc++` version mismatch | Move conda's libstdc++ to `lib/_unused/` |
+| Robot falls immediately in MuJoCo | Normal — needs trained policy loaded |
+| ROS 2 topic issues | Check `ros2 topic list`, verify GZ bridge is running |
 
 ---
 
 ## References
 
 - [Humanoid-Gym: Zero-Shot Sim2Real Transfer](https://arxiv.org/abs/2404.05695) — RobotEra / Tsinghua
+- [Advancing Humanoid Locomotion with Denoising World Model Learning](https://enriquecoronadozu.github.io/rssproceedings2024/rss20/p058.pdf) — RSS 2024
 - [legged_gym](https://github.com/leggedrobotics/legged_gym) — ETH Zurich RSL
 - [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie) — DeepMind
-- [Isaac Gym](https://developer.nvidia.com/isaac-gym) — NVIDIA
 
 ---
 
 ## License
 
-MIT License
+BSD-3-Clause License
