@@ -1,4 +1,4 @@
-# Humanoid RL — Bipedal Locomotion with Sim-to-Real Transfer
+proepr# Humanoid RL — Bipedal Locomotion with Sim-to-Real Transfer
 
 A reinforcement learning framework for training bipedal humanoid robots to walk, combining **MuJoCo** simulation with **ROS 2 Humble** deployment pipelines. Trained policies transfer from simulation to real hardware via domain randomization and system identification.
 
@@ -19,6 +19,10 @@ This project implements end-to-end reinforcement learning for humanoid locomotio
 
 ```
 rl-bipedal-walking/
+├── humanoid_descriptions/           # Vendored humanoid robot sources
+│   ├── ros/                         # ROS/Gazebo-oriented packages
+│   ├── rl/                          # RL training stacks from official sources
+│   └── urdf_only/                   # Description-focused robot packages
 ├── humanoid/                         # RL training package
 │   ├── envs/
 │   │   ├── base/                     # Base legged robot environment
@@ -52,6 +56,14 @@ rl-bipedal-walking/
 ├── setup.py                          # Package install
 └── requirements.txt
 ```
+
+---
+
+## Current Status
+
+- The main RL stack in `humanoid/` is the primary training code in this repo today.
+- The ROS 2 workspace in `ros2_ws/` can spawn the current humanoid model in Gazebo Sim, but it is not a full `ros2_control` stack yet.
+- Official external humanoid sources are mirrored under `humanoid_descriptions/` so you can swap in stronger robot descriptions without adding nested Git repos.
 
 ---
 
@@ -124,6 +136,12 @@ source install/setup.bash
 
 # Launch Gazebo Sim with humanoid robot
 ros2 launch bipedal_robot_description spawn_robot.launch.py
+```
+
+To launch the alternate Gazebo entrypoint:
+
+```bash
+ros2 launch bipedal_robot_description gazebo_launch.py
 ```
 
 ---
@@ -209,6 +227,11 @@ The `ros2_ws` provides deployment infrastructure on ROS 2 Humble:
 - **Joint state publisher** and `robot_state_publisher`
 - **RViz** visualization config
 - Scaffolding for **policy inference node** (trained model → joint torque commands)
+- A lightweight spawn path for testing descriptions before integrating controllers
+
+Current limitation:
+
+`ros2_control` is not fully wired into the local `bipedal_robot_description` package yet, so the ROS workspace is currently better suited for description validation and spawn testing than for full controller bring-up.
 
 ```bash
 # Key ROS 2 topics
@@ -219,6 +242,105 @@ The `ros2_ws` provides deployment infrastructure on ROS 2 Humble:
 
 ---
 
+## Testing Humanoids In Gazebo
+
+There are two different simulation paths in this repo:
+
+- `ros2_ws/` uses **ROS 2 Humble + Gazebo Sim**
+- `humanoid_descriptions/ros/unitree_ros` and `humanoid_descriptions/urdf_only/berkeley_humanoid_description` are imported from **ROS 1 + classic Gazebo** ecosystems
+
+### 1. Test the local ROS 2 humanoid
+
+Use this when you want to validate the repo's current ROS 2 spawn flow:
+
+```bash
+cd ros2_ws
+source /opt/ros/humble/setup.bash
+colcon build --symlink-install
+source install/setup.bash
+
+ros2 launch bipedal_robot_description spawn_robot.launch.py
+```
+
+Alternate Gazebo entrypoint:
+
+```bash
+ros2 launch bipedal_robot_description gazebo_launch.py
+```
+
+### 2. Test imported Unitree humanoids
+
+The imported Unitree packages live in:
+
+- `humanoid_descriptions/ros/unitree_ros/robots/g1_description`
+- `humanoid_descriptions/ros/unitree_ros/robots/h1_description`
+- `humanoid_descriptions/ros/unitree_ros/robots/h1_2_description`
+- `humanoid_descriptions/ros/unitree_ros/robots/h2_description`
+- `humanoid_descriptions/ros/unitree_ros/robots/r1_description`
+- `humanoid_descriptions/ros/unitree_ros/robots/r1_air_description`
+
+These are ROS 1 packages. Start with the one that already includes a direct Gazebo launch:
+
+```bash
+cd humanoid_descriptions/ros/unitree_ros
+# inside a ROS 1 catkin workspace
+roslaunch h1_description gazebo.launch
+```
+
+For quick visual checks without Gazebo:
+
+```bash
+roslaunch h1_description display.launch
+```
+
+The imported `unitree_gazebo` and `unitree_controller` packages are also included for classic Gazebo and low-level controller experiments.
+
+Important note:
+
+The upstream Unitree stack is aimed at ROS 1 and classic Gazebo, not the local ROS 2 Gazebo Sim workspace in this repo.
+
+### 3. Test Berkeley Humanoid
+
+The Berkeley package is imported under:
+
+- `humanoid_descriptions/urdf_only/berkeley_humanoid_description`
+
+Classic Gazebo test:
+
+```bash
+# inside a ROS 1 catkin workspace
+roslaunch berkeley_humanoid_description empty_world.launch
+```
+
+Standalone URDF/RViz test:
+
+```bash
+roslaunch berkeley_humanoid_description standalone.launch
+```
+
+### 4. Test Booster and RobotEra models
+
+These imports are best treated as description sources first:
+
+- `humanoid_descriptions/urdf_only/booster_assets`
+- `humanoid_descriptions/urdf_only/robotera_models`
+
+Useful files include:
+
+- `humanoid_descriptions/urdf_only/booster_assets/robots/T1/T1_23dof.urdf`
+- `humanoid_descriptions/urdf_only/booster_assets/robots/K1/K1_22dof.urdf`
+- `humanoid_descriptions/urdf_only/robotera_models/star1`
+
+They do not yet come with a ready-to-run local ROS 2 spawn wrapper in this repo, so the usual next step is:
+
+1. Copy the chosen URDF and meshes into a ROS package
+2. Point `robot_state_publisher` at that URDF
+3. Spawn it with either `ros_gz_sim create` in ROS 2 or `gazebo_ros spawn_model` in ROS 1
+
+If you want, the next integration step is to replace `ros2_ws/src/bipedal_robot_description/urdf/bipedal.urdf` with one of these imported robots and add a dedicated launch package for it.
+
+---
+
 ## Adding a New Robot
 
 1. Add URDF and MJCF assets to `resources/robots/<your_robot>/`
@@ -226,6 +348,8 @@ The `ros2_ws` provides deployment infrastructure on ROS 2 Humble:
 3. Set asset path, body names, default joint angles, and PD gains
 4. Register the task in `humanoid/envs/__init__.py`
 5. Update `sim2sim.py` joint mapping if needed
+
+If you want to start from an existing robot instead of creating one from scratch, check `humanoid_descriptions/` first. The vendored sources include official Unitree stacks plus Berkeley, Booster, and RobotEra description packages.
 
 ---
 

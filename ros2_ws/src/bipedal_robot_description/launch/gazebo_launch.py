@@ -1,7 +1,9 @@
 import os
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.conditions import IfCondition
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 
@@ -11,14 +13,20 @@ def generate_launch_description():
     # Declare launch arguments
     world_file_arg = DeclareLaunchArgument(
         'world_file',
-        default_value=os.path.join(pkg_bipedal_description, 'worlds', 'empty_world.sdf'),
-        description='World file to load in Ignition Gazebo'
+        default_value='empty.sdf',
+        description='World file or Gazebo resource name to load in Gazebo Sim'
     )
 
     use_sim_time_arg = DeclareLaunchArgument(
         'use_sim_time',
         default_value='true',
         description='Use simulation time'
+    )
+
+    joint_state_gui_arg = DeclareLaunchArgument(
+        'joint_state_gui',
+        default_value='false',
+        description='Launch joint_state_publisher_gui for manual joint control'
     )
 
     # Load robot description
@@ -36,15 +44,18 @@ def generate_launch_description():
         }]
     )
 
-    # Launch Ignition Gazebo
-    gz_sim = Node(
-        package='ros_gz_sim',
-        executable='gz_sim',
-        output='screen',
-        arguments=[
-            LaunchConfiguration('world_file'),
-            '-v', '4'   # verbosity
-        ]
+    # Launch Gazebo Sim through the packaged ros_gz_sim launch file.
+    gz_sim = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([
+            PathJoinSubstitution([
+                get_package_share_directory('ros_gz_sim'),
+                'launch',
+                'gz_sim.launch.py'
+            ])
+        ]),
+        launch_arguments={
+            'gz_args': ['-r ', LaunchConfiguration('world_file')]
+        }.items()
     )
 
     # Spawn robot in Ignition Gazebo
@@ -64,12 +75,14 @@ def generate_launch_description():
         package='joint_state_publisher_gui',
         executable='joint_state_publisher_gui',
         name='joint_state_publisher_gui',
-        parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}]
+        parameters=[{'use_sim_time': LaunchConfiguration('use_sim_time')}],
+        condition=IfCondition(LaunchConfiguration('joint_state_gui'))
     )
 
     return LaunchDescription([
         world_file_arg,
         use_sim_time_arg,
+        joint_state_gui_arg,
         gz_sim,
         robot_state_publisher,
         spawn_robot,
