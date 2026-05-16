@@ -446,4 +446,45 @@
     </inertial>
   </link>
 
+
+  <!-- ── ros2_control hardware interface ───────────────────────────── -->
+  <ros2_control name="bipedal_hw" type="system">
+    <hardware>
+      <!-- Swap to real hardware plugin when deploying:
+           <plugin>your_hw_pkg/BipedalHardwareInterface</plugin> -->
+      <plugin>mock_components/GenericSystem</plugin>
+    </hardware>
+
+    <joint name="left_hip_joint">
+      <command_interface name="position"/>
+      <state_interface   name="position"/>
+      <state_interface   name="velocity"/>
+    </joint>
+    <joint name="left_knee_joint">
+      <command_interface name="position"/>
+      <state_interface   name="position"/>
+      <state_interface   name="velocity"/>
+    </joint>
+    <joint name="left_ankle_joint">
+      <command_interface name="position"/>
+      <state_interface   name="position"/>
+      <state_interface   name="velocity"/>
+    </joint>
+    <joint name="right_hip_joint">
+      <command_interface name="position"/>
+      <state_interface   name="position"/>
+      <state_interface   name="velocity"/>
+    </joint>
+    <joint name="right_knee_joint">
+      <command_interface name="position"/>
+      <state_interface   name="position"/>
+      <state_interface   name="velocity"/>
+    </joint>
+    <joint name="right_ankle_joint">
+      <command_interface name="position"/>
+      <state_interface   name="position"/>
+      <state_interface   name="velocity"/>
+    </joint>
+  </ros2_control>
+
 </robot>

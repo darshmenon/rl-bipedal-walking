@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>policy_runner</name>
+  <version>0.1.0</version>
+  <description>Loads a trained JIT locomotion policy and publishes joint position commands via ros2_control.</description>
+  <maintainer email="darshmenon02@gmail.com">darshmenon</maintainer>
+  <license>BSD-3-Clause</license>
+
+  <depend>rclpy</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>trajectory_msgs</depend>
+  <depend>control_msgs</depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

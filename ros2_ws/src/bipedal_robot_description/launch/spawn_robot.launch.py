@@ -1,6 +1,10 @@
 import os
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, ExecuteProcess
+from launch.actions import (
+    DeclareLaunchArgument, IncludeLaunchDescription,
+    ExecuteProcess, RegisterEventHandler,
+)
+from launch.event_handlers import OnProcessExit
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
@@ -77,6 +81,32 @@ def generate_launch_description():
         output='screen'
     )
 
+    controllers_yaml = os.path.join(pkg_bipedal_description, 'config', 'controllers.yaml')
+
+    # Controller manager (ros2_control)
+    controller_manager = Node(
+        package='controller_manager',
+        executable='ros2_control_node',
+        parameters=[{'robot_description': robot_description}, controllers_yaml],
+        output='screen',
+    )
+
+    # Spawn joint_state_broadcaster first, then position_controller
+    load_jsb = ExecuteProcess(
+        cmd=['ros2', 'control', 'load_controller', '--set-state', 'active',
+             'joint_state_broadcaster'],
+        output='screen',
+    )
+    load_pos = ExecuteProcess(
+        cmd=['ros2', 'control', 'load_controller', '--set-state', 'active',
+             'position_controller'],
+        output='screen',
+    )
+    # activate position_controller only after broadcaster is up
+    activate_pos = RegisterEventHandler(
+        OnProcessExit(target_action=load_jsb, on_exit=[load_pos])
+    )
+
     # ROS-GZ bridge for topics
     bridge = Node(
         package='ros_gz_bridge',
@@ -85,7 +115,7 @@ def generate_launch_description():
             '/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock',
             '/world/empty/model/bipedal_robot/joint_state@sensor_msgs/msg/JointState[gz.msgs.Model',
         ],
-        output='screen'
+        output='screen',
     )
 
     return LaunchDescription([
@@ -95,6 +125,9 @@ def generate_launch_description():
         use_sim_time_arg,
         gz_sim,
         robot_state_publisher,
+        controller_manager,
         spawn_robot,
-        bridge
+        bridge,
+        load_jsb,
+        activate_pos,
     ])

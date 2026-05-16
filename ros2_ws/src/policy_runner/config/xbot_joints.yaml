@@ -1,0 +1,55 @@
+policy_runner:
+  ros__parameters:
+    # Path to exported JIT policy (overridden at launch time)
+    policy_path: ""
+
+    # Joint names in the order the policy expects them (must match training order)
+    joint_names:
+      - left_leg_roll_joint
+      - left_leg_yaw_joint
+      - left_leg_pitch_joint
+      - left_knee_joint
+      - left_ankle_pitch_joint
+      - left_ankle_roll_joint
+      - right_leg_roll_joint
+      - right_leg_yaw_joint
+      - right_leg_pitch_joint
+      - right_knee_joint
+      - right_ankle_pitch_joint
+      - right_ankle_roll_joint
+
+    # ros2_control forward-position controller topic
+    joint_command_topic: /position_controller/commands
+
+    # Policy runs at 100 Hz (10× decimation on 1 kHz sim)
+    policy_frequency: 100.0
+
+    # Observation scales (must match training normalization)
+    obs_scale_lin_vel: 2.0
+    obs_scale_ang_vel: 1.0
+    obs_scale_dof_pos: 1.0
+    obs_scale_dof_vel: 0.05
+    obs_scale_quat:    1.0
+
+    # Frame stack depth (must match training)
+    frame_stack: 15
+    num_single_obs: 47
+
+    # Clip limits
+    clip_obs:     18.0
+    clip_actions: 18.0
+
+    # Default standing joint positions [rad]
+    default_joint_pos:
+      - 0.0   # left_leg_roll
+      - 0.0   # left_leg_yaw
+      - 0.0   # left_leg_pitch
+      - 0.0   # left_knee
+      - 0.0   # left_ankle_pitch
+      - 0.0   # left_ankle_roll
+      - 0.0   # right_leg_roll
+      - 0.0   # right_leg_yaw
+      - 0.0   # right_leg_pitch
+      - 0.0   # right_knee
+      - 0.0   # right_ankle_pitch
+      - 0.0   # right_ankle_roll

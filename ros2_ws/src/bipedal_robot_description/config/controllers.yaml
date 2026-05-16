@@ -1,0 +1,20 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 1000  # Hz — matches sim dt=0.001
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    position_controller:
+      type: forward_command_controller/ForwardCommandController
+
+position_controller:
+  ros__parameters:
+    joints:
+      - left_hip_joint
+      - left_knee_joint
+      - left_ankle_joint
+      - right_hip_joint
+      - right_knee_joint
+      - right_ankle_joint
+    interface_name: position
