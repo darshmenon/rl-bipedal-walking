@@ -36,6 +36,7 @@ from collections import deque
 from scipy.spatial.transform import Rotation as R
 from humanoid import LEGGED_GYM_ROOT_DIR
 from humanoid.envs import XBotLCfg
+from humanoid.envs.custom.h1_config import H1Cfg
 import torch
 
 
@@ -67,15 +68,23 @@ def quaternion_to_euler_array(quat):
     # Returns roll, pitch, yaw in a NumPy array in radians
     return np.array([roll_x, pitch_y, yaw_z])
 
-def get_obs(data):
-    '''Extracts an observation from the mujoco data structure
-    '''
+def get_obs(data, use_imu_sensor=False):
+    """Extracts an observation from the mujoco data structure.
+
+    XBot has an 'orientation' quaternion sensor; H1 only has a gyro, so we
+    read the base quaternion directly from qpos[3:7] instead.
+    """
     q = data.qpos.astype(np.double)
     dq = data.qvel.astype(np.double)
-    quat = data.sensor('orientation').data[[1, 2, 3, 0]].astype(np.double)
+    if use_imu_sensor:
+        quat = data.sensor('orientation').data[[1, 2, 3, 0]].astype(np.double)
+        omega = data.sensor('angular-velocity').data.astype(np.double)
+    else:
+        # qpos[3:7] is (w, x, y, z) in MuJoCo free-joint convention → reorder to (x,y,z,w)
+        quat = data.qpos[3:7][[1, 2, 3, 0]].astype(np.double)
+        omega = data.sensor('imu-angular-velocity').data.astype(np.double)
     r = R.from_quat(quat)
-    v = r.apply(data.qvel[:3], inverse=True).astype(np.double)  # In the base frame
-    omega = data.sensor('angular-velocity').data.astype(np.double)
+    v = r.apply(data.qvel[:3], inverse=True).astype(np.double)
     gvec = r.apply(np.array([0., 0., -1.]), inverse=True).astype(np.double)
     return (q, dq, quat, v, omega, gvec)
 
@@ -101,22 +110,29 @@ def run_mujoco(policy, cfg):
     mujoco.mj_step(model, data)
     viewer = mujoco_viewer.MujocoViewer(model, data)
 
-    target_q = np.zeros((cfg.env.num_actions), dtype=np.double)
-    action = np.zeros((cfg.env.num_actions), dtype=np.double)
+    num_actions = cfg.env.num_actions
+    # For robots with more MJCF actuators than policy outputs (e.g. H1 has 19
+    # MJCF motors but the leg-only policy uses 10), we only command the first
+    # num_actions actuators and leave the rest at zero.
+    full_ctrl = np.zeros(model.nu, dtype=np.double)
+
+    target_q = np.zeros(num_actions, dtype=np.double)
+    action = np.zeros(num_actions, dtype=np.double)
 
     hist_obs = deque()
     for _ in range(cfg.env.frame_stack):
         hist_obs.append(np.zeros([1, cfg.env.num_single_obs], dtype=np.double))
 
     count_lowlevel = 0
-
+    use_imu = cfg.sim_config.use_imu_sensor
 
     for _ in tqdm(range(int(cfg.sim_config.sim_duration / cfg.sim_config.dt)), desc="Simulating..."):
 
         # Obtain an observation
-        q, dq, quat, v, omega, gvec = get_obs(data)
-        q = q[-cfg.env.num_actions:]
-        dq = dq[-cfg.env.num_actions:]
+        q, dq, quat, v, omega, gvec = get_obs(data, use_imu_sensor=use_imu)
+        # joint positions/velocities: skip the 7 free-joint DOFs at the front
+        q  = q[7 : 7 + num_actions]
+        dq = dq[6 : 6 + num_actions]
 
         # 1000hz -> 100hz
         if count_lowlevel % cfg.sim_config.decimation == 0:
@@ -150,12 +166,13 @@ def run_mujoco(policy, cfg):
             target_q = action * cfg.control.action_scale
 
 
-        target_dq = np.zeros((cfg.env.num_actions), dtype=np.double)
+        target_dq = np.zeros(num_actions, dtype=np.double)
         # Generate PD control
         tau = pd_control(target_q, q, cfg.robot_config.kps,
-                        target_dq, dq, cfg.robot_config.kds)  # Calc torques
-        tau = np.clip(tau, -cfg.robot_config.tau_limit, cfg.robot_config.tau_limit)  # Clamp torques
-        data.ctrl = tau
+                        target_dq, dq, cfg.robot_config.kds)
+        tau = np.clip(tau, -cfg.robot_config.tau_limit, cfg.robot_config.tau_limit)
+        full_ctrl[:num_actions] = tau
+        data.ctrl = full_ctrl
 
         mujoco.mj_step(model, data)
         viewer.render()
@@ -167,27 +184,46 @@ def run_mujoco(policy, cfg):
 if __name__ == '__main__':
     import argparse
 
-    parser = argparse.ArgumentParser(description='Deployment script.')
-    parser.add_argument('--load_model', type=str, required=True,
-                        help='Run to load from.')
-    parser.add_argument('--terrain', action='store_true', help='terrain or plane')
+    parser = argparse.ArgumentParser(description='Sim-to-sim MuJoCo validation.')
+    parser.add_argument('--load_model', type=str, required=True, help='Path to JIT policy .pt file.')
+    parser.add_argument('--terrain', action='store_true', help='Use terrain MJCF instead of flat plane.')
+    parser.add_argument('--robot', type=str, default='xbot', choices=['xbot', 'h1'],
+                        help='Robot to simulate (xbot or h1).')
     args = parser.parse_args()
 
-    class Sim2simCfg(XBotLCfg):
+    if args.robot == 'h1':
+        class Sim2simCfg(H1Cfg):
+            class sim_config:
+                mujoco_model_path = (
+                    f'{LEGGED_GYM_ROOT_DIR}/humanoid_descriptions/ros/unitree_ros'
+                    f'/robots/h1_description/mjcf/h1.xml'
+                )
+                sim_duration = 60.0
+                dt = 0.001
+                decimation = 10
+                use_imu_sensor = False   # H1 has no 'orientation' sensor — use qpos
 
-        class sim_config:
-            if args.terrain:
-                mujoco_model_path = f'{LEGGED_GYM_ROOT_DIR}/resources/robots/XBot/mjcf/XBot-L-terrain.xml'
-            else:
-                mujoco_model_path = f'{LEGGED_GYM_ROOT_DIR}/resources/robots/XBot/mjcf/XBot-L.xml'
-            sim_duration = 60.0
-            dt = 0.001
-            decimation = 10
+            class robot_config:
+                # 10 leg joints: yaw, roll, pitch (×2 hips), knee, ankle (left then right)
+                kps = np.array([200, 200, 350, 350, 15, 200, 200, 350, 350, 15], dtype=np.double)
+                kds = np.array([10, 10, 10, 10, 10, 10, 10, 10, 10, 10], dtype=np.double)
+                tau_limit = np.array([200, 200, 200, 300, 40, 200, 200, 200, 300, 40], dtype=np.double)
+    else:
+        class Sim2simCfg(XBotLCfg):
+            class sim_config:
+                if args.terrain:
+                    mujoco_model_path = f'{LEGGED_GYM_ROOT_DIR}/resources/robots/XBot/mjcf/XBot-L-terrain.xml'
+                else:
+                    mujoco_model_path = f'{LEGGED_GYM_ROOT_DIR}/resources/robots/XBot/mjcf/XBot-L.xml'
+                sim_duration = 60.0
+                dt = 0.001
+                decimation = 10
+                use_imu_sensor = True   # XBot has an 'orientation' quaternion sensor
 
-        class robot_config:
-            kps = np.array([200, 200, 350, 350, 15, 15, 200, 200, 350, 350, 15, 15], dtype=np.double)
-            kds = np.array([10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10], dtype=np.double)
-            tau_limit = 200. * np.ones(12, dtype=np.double)
+            class robot_config:
+                kps = np.array([200, 200, 350, 350, 15, 15, 200, 200, 350, 350, 15, 15], dtype=np.double)
+                kds = np.array([10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10], dtype=np.double)
+                tau_limit = 200. * np.ones(12, dtype=np.double)
 
     policy = torch.jit.load(args.load_model)
     run_mujoco(policy, Sim2simCfg())
