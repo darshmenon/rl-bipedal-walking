@@ -1,6 +1,6 @@
 torch>=1.13
-numpy==1.23.5
-mujoco==2.3.6
+numpy>=1.23
+mujoco>=2.3.6
 mujoco-python-viewer
 scipy
 matplotlib>=3.5.0
@@ -8,6 +8,7 @@ opencv-python
 tensorboard
 wandb
 tqdm
-gymnasium
+gymnasium>=0.26
 stable-baselines3
 transforms3d>=0.3.1
+tensorboard>=2.10
