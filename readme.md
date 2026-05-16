@@ -8,10 +8,12 @@ A reinforcement learning framework for training bipedal humanoid robots to walk,
 
 This project implements end-to-end reinforcement learning for humanoid locomotion:
 
-- **Training** — PPO-based policy learning with parallel environments and reward shaping for stable bipedal walking
-- **Sim-to-Sim Validation** — Transfer trained policies to MuJoCo for physics cross-validation before hardware deployment
+- **PPO training** — Parallel Isaac Gym environments with reward shaping for stable bipedal walking (XBot-L, Unitree H1 leg-only, H1 whole-body)
+- **SAC training** — Off-policy training on a lightweight MuJoCo gym env — no Isaac Gym required
+- **Terrain curriculum** — Progressive difficulty from flat plane to rough trimesh via `--terrain` flag
+- **Sim-to-Sim Validation** — Transfer trained policies to MuJoCo for physics cross-validation before hardware deployment (XBot and H1)
 - **Sim-to-Real Transfer** — Domain randomization, actuator modeling, and system identification for zero-shot transfer
-- **ROS 2 Deployment** — Integration with Gazebo Sim and real robot control stacks via ROS 2 Humble
+- **ROS 2 Deployment** — Policy inference node publishes joint commands via `ros2_control` ForwardCommandController at 100 Hz; hardware safety guard mode included
 
 ---
 
@@ -23,17 +25,21 @@ rl-bipedal-walking/
 │   ├── ros/                         # ROS/Gazebo-oriented packages
 │   ├── rl/                          # RL training stacks from official sources
 │   └── urdf_only/                   # Description-focused robot packages
-├── humanoid/                         # RL training package
+├── humanoid/                         # RL training package (Isaac Gym / PPO)
 │   ├── envs/
 │   │   ├── base/                     # Base legged robot environment
 │   │   └── custom/
-│   │       ├── humanoid_env.py       # Humanoid env (rewards, obs, domain rand)
-│   │       └── humanoid_config.py    # Training & environment hyperparameters
+│   │       ├── humanoid_env.py       # XBot env (rewards, obs, domain rand)
+│   │       ├── humanoid_config.py    # XBot training hyperparameters
+│   │       ├── h1_env.py             # Unitree H1 leg-only env (10 DOF)
+│   │       ├── h1_config.py          # H1 leg-only config
+│   │       ├── h1_wholebody_env.py   # H1 whole-body env (18 DOF, arms + legs)
+│   │       └── h1_wholebody_config.py# H1 whole-body config
 │   ├── scripts/
-│   │   ├── train.py                  # Launch RL training
+│   │   ├── train.py                  # PPO training (--terrain, --use_wandb flags)
 │   │   ├── play.py                   # Visualize & export trained policy
-│   │   └── sim2sim.py                # MuJoCo sim-to-sim validation
-│   ├── algo/                         # PPO implementation
+│   │   └── sim2sim.py                # MuJoCo sim-to-sim (--robot xbot|h1)
+│   ├── algo/                         # PPO + accuracy metrics
 │   └── utils/                        # Logging, terrain, task registry
 ├── resources/
 │   └── robots/
@@ -42,15 +48,26 @@ rl-bipedal-walking/
 │           └── mjcf/                 # MuJoCo XML models
 ├── ros2_ws/                          # ROS 2 Humble workspace
 │   └── src/
-│       └── bipedal_robot_description/
-│           ├── urdf/                 # Robot description
-│           ├── launch/               # Gazebo Sim launch files
-│           └── config/               # RViz configs
-├── src/                              # Additional Gym environments
+│       ├── bipedal_robot_description/
+│       │   ├── urdf/                 # Robot description (ros2_control tags added)
+│       │   ├── launch/               # Gazebo Sim + controller manager launch
+│       │   └── config/               # RViz config + controllers.yaml
+│       └── policy_runner/            # Policy inference node (100 Hz)
+│           ├── policy_runner/
+│           │   └── policy_inference_node.py
+│           ├── config/xbot_joints.yaml
+│           └── launch/policy_runner.launch.py
+├── src/                              # Standalone (no Isaac Gym) stack
 │   └── rl_bipedal_walking/
-│       ├── environments/             # Gymnasium-compatible wrappers
-│       ├── agents/                   # PPO / SAC agents
-│       └── training/                 # Training scripts
+│       ├── environments/
+│       │   ├── bipedal_env.py        # Gazebo-backed gym env (ROS2)
+│       │   └── mujoco_env.py         # Standalone MuJoCo gym env (XBot / H1)
+│       ├── agents/
+│       │   ├── ppo_agent.py          # PPO agent
+│       │   └── sac_agent.py          # SAC with twin-Q + auto-entropy
+│       └── training/
+│           ├── train_walker.py       # PPO training script
+│           └── train_sac.py          # SAC training script
 ├── scripts/                          # Shell helper scripts
 ├── logs/                             # Training run logs & exported policies
 ├── setup.py                          # Package install
@@ -61,9 +78,20 @@ rl-bipedal-walking/
 
 ## Current Status
 
-- The main RL stack in `humanoid/` is the primary training code in this repo today.
-- The ROS 2 workspace in `ros2_ws/` can spawn the current humanoid model in Gazebo Sim, but it is not a full `ros2_control` stack yet.
-- Official external humanoid sources are mirrored under `humanoid_descriptions/` so you can swap in stronger robot descriptions without adding nested Git repos.
+| Area | Status |
+|---|---|
+| XBot-L PPO training | Working |
+| Unitree H1 leg-only PPO (`h1_ppo`) | Config + env ready — requires Isaac Gym |
+| Unitree H1 whole-body PPO (`h1_wholebody_ppo`) | Config + env ready — requires Isaac Gym |
+| SAC training on MuJoCo gym env | Working — no Isaac Gym needed |
+| Terrain curriculum (`--terrain`) | Working — enabled via CLI flag |
+| TensorBoard + W&B logging | TensorBoard always on; W&B opt-in via `--use_wandb` |
+| Accuracy metrics in TensorBoard | Velocity tracking + gait contact accuracy logged |
+| Sim-to-sim MuJoCo (XBot) | Working |
+| Sim-to-sim MuJoCo (H1) | Working via `--robot h1` |
+| ROS 2 Gazebo Sim spawn | Working |
+| `ros2_control` ForwardCommandController | Wired — `controllers.yaml` + updated URDF |
+| Policy inference node (sim + hardware) | Working — `policy_runner` package |
 
 ---
 
@@ -97,18 +125,36 @@ pip install -r requirements.txt
 
 ### 3. Train a Locomotion Policy
 
+**PPO — Isaac Gym parallel environments (requires GPU + Isaac Gym)**
+
 ```bash
-# PPO training with 4096 parallel environments
+# XBot-L — flat plane
 python humanoid/scripts/train.py --task humanoid_ppo --run_name v1 --headless --num_envs 4096
 
-# Unitree H1 leg-only PPO task
-python humanoid/scripts/train.py --task h1_ppo --run_name h1_v1 --headless --num_envs 4096
+# XBot-L — terrain curriculum + W&B logging
+python humanoid/scripts/train.py --task humanoid_ppo --run_name v1_terrain --headless --terrain --use_wandb
 
-# Unitree H1 whole-body PPO task
-python humanoid/scripts/train.py --task h1_wholebody_ppo --run_name h1_body_v1 --headless --num_envs 4096
+# Unitree H1 leg-only
+python humanoid/scripts/train.py --task h1_ppo --run_name h1_v1 --headless
+
+# Unitree H1 whole-body (legs + arms)
+python humanoid/scripts/train.py --task h1_wholebody_ppo --run_name h1_wb_v1 --headless
 ```
 
-Training runs with parallel environments. Policy checkpoints are saved to `logs/`.
+**SAC — MuJoCo gym environment (no Isaac Gym needed)**
+
+```bash
+# Train SAC on H1 (CPU or GPU)
+python src/rl_bipedal_walking/training/train_sac.py --robot h1 --steps 1000000
+
+# Train SAC on XBot
+python src/rl_bipedal_walking/training/train_sac.py --robot xbot --device cuda
+
+# With W&B
+python src/rl_bipedal_walking/training/train_sac.py --robot h1 --use_wandb
+```
+
+Policy checkpoints are saved to `logs/`.
 
 ### 4. Visualize & Export the Policy
 
@@ -122,33 +168,44 @@ This exports a JIT-compiled policy to `logs/<experiment>/exported/policies/` for
 ### 5. Sim-to-Sim: Transfer to MuJoCo
 
 ```bash
-# Run trained policy in MuJoCo for validation
+# XBot-L validation (flat)
 python humanoid/scripts/sim2sim.py --load_model logs/XBot_ppo/exported/policies/policy_1.pt
 
-# With terrain
+# XBot-L with terrain
 python humanoid/scripts/sim2sim.py --load_model logs/XBot_ppo/exported/policies/policy_1.pt --terrain
+
+# Unitree H1 validation
+python humanoid/scripts/sim2sim.py --load_model logs/H1_ppo/exported/policies/policy_1.pt --robot h1
 ```
 
 Validates the trained policy under MuJoCo physics before deploying to hardware.
 
-### 6. ROS 2 + Gazebo Sim
+### 6. ROS 2 + Gazebo Sim + ros2_control
 
 ```bash
-# Build ROS 2 workspace
+# Build ROS 2 workspace (includes policy_runner package)
 cd ros2_ws
 source /opt/ros/humble/setup.bash
 colcon build --symlink-install
 source install/setup.bash
 
-# Launch Gazebo Sim with humanoid robot
+# Launch Gazebo Sim with humanoid robot + ros2_control controller manager
 ros2 launch bipedal_robot_description spawn_robot.launch.py
 ```
 
-To launch the alternate Gazebo entrypoint:
+### 7. Deploy Policy (Simulation or Hardware)
 
 ```bash
-ros2 launch bipedal_robot_description gazebo_launch.py
+# Run trained policy in Gazebo Sim at 100 Hz
+ros2 launch policy_runner policy_runner.launch.py \
+  policy_path:=/abs/path/to/policy_1.pt
+
+# Run on real hardware (enables per-step safety guard)
+ros2 launch policy_runner policy_runner.launch.py \
+  policy_path:=/abs/path/to/policy_1.pt hardware:=true
 ```
+
+The `policy_runner` node subscribes to `/joint_states`, `/odom`, and `/cmd_vel`, then publishes joint position targets to `/position_controller/commands` at 100 Hz.
 
 ---
 
@@ -170,6 +227,24 @@ The primary training algorithm uses an actor-critic architecture with the follow
 | Entropy Coef | 0.001 |
 | Parallel Envs | 4096 |
 | Max Iterations | 3000 |
+
+### SAC (Soft Actor-Critic)
+
+Off-policy alternative that trains on the standalone MuJoCo gym env — no Isaac Gym or large parallel simulation required.
+
+| Parameter | Value |
+|---|---|
+| Actor / Critic | 2-layer MLP [256, 256] |
+| Twin-Q critics | Yes (reduces overestimation) |
+| Entropy tuning | Automatic (target = −action_dim) |
+| Learning Rate | 3e-4 |
+| Discount (γ) | 0.99 |
+| Soft update (τ) | 0.005 |
+| Replay Buffer | 1M transitions |
+| Batch Size | 256 |
+| Warm-up steps | 10k random actions |
+
+---
 
 ### Reward Function
 
