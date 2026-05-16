@@ -30,7 +30,11 @@ def train(args):
     log_dir  = os.path.join(args.log_dir, run_name)
     os.makedirs(log_dir, exist_ok=True)
 
-    env = MujocoBipedalEnv(robot=args.robot)
+    env = MujocoBipedalEnv(
+        robot=args.robot,
+        domain_rand=not args.no_domain_rand,
+        frame_stack=args.frame_stack,
+    )
     state_dim  = env.observation_space.shape[0]
     action_dim = env.action_space.shape[0]
 
@@ -129,7 +133,11 @@ def main():
                    help='Save checkpoint every N episodes.')
     p.add_argument('--log_dir',        type=str,   default='logs/sac')
     p.add_argument('--device',         type=str,   default='cpu')
-    p.add_argument('--use_wandb',      action='store_true')
+    p.add_argument('--use_wandb',        action='store_true')
+    p.add_argument('--no_domain_rand',   action='store_true',
+                   help='Disable per-episode friction/mass randomisation.')
+    p.add_argument('--frame_stack',      type=int, default=1,
+                   help='Observation frame stack depth (1=no stacking, 15=PPO-equivalent).')
     return train(p.parse_args())
 
 
