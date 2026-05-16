@@ -217,8 +217,7 @@ class OnPolicyRunner:
             for key in ("tracking_lin_vel", "tracking_ang_vel", "feet_contact_number"):
                 vals = [ep[key] for ep in locs["ep_infos"] if key in ep]
                 if vals:
-                    import torch as _torch
-                    tensor = _torch.stack([v if isinstance(v, _torch.Tensor) else _torch.tensor([v]) for v in vals])
+                    tensor = torch.stack([v if isinstance(v, torch.Tensor) else torch.tensor([v]) for v in vals])
                     self.writer.add_scalar(f"Accuracy/{key}", tensor.mean().item(), locs["it"])
         self.writer.add_scalar("Perf/total_fps", fps, locs["it"])
         self.writer.add_scalar(
