@@ -144,6 +144,11 @@ def update_cfg_from_args(env_cfg, cfg_train, args):
         # num envs
         if args.num_envs is not None:
             env_cfg.env.num_envs = args.num_envs
+    if env_cfg is not None:
+        if getattr(args, "terrain", False):
+            env_cfg.terrain.mesh_type = "trimesh"
+            env_cfg.terrain.curriculum = True
+            env_cfg.terrain.measure_heights = True
     if cfg_train is not None:
         if args.seed is not None:
             cfg_train.seed = args.seed
@@ -156,6 +161,8 @@ def update_cfg_from_args(env_cfg, cfg_train, args):
             cfg_train.runner.experiment_name = args.experiment_name
         if args.run_name is not None:
             cfg_train.runner.run_name = args.run_name
+        if getattr(args, "use_wandb", False):
+            cfg_train.runner.use_wandb = True
         if args.load_run is not None:
             cfg_train.runner.load_run = args.load_run
         if args.checkpoint is not None:
@@ -230,6 +237,18 @@ def get_args():
             "name": "--max_iterations",
             "type": int,
             "help": "Maximum number of training iterations. Overrides config file if provided.",
+        },
+        {
+            "name": "--use_wandb",
+            "action": "store_true",
+            "default": False,
+            "help": "Enable Weights & Biases logging during training.",
+        },
+        {
+            "name": "--terrain",
+            "action": "store_true",
+            "default": False,
+            "help": "Enable trimesh terrain with difficulty curriculum instead of flat plane.",
         },
     ]
     # parse arguments

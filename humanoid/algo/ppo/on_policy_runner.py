@@ -50,6 +50,7 @@ class OnPolicyRunner:
         self.alg_cfg = train_cfg["algorithm"]
         self.policy_cfg = train_cfg["policy"]
         self.all_cfg = train_cfg
+        self.use_wandb = self.cfg.get("use_wandb", False)
         self.wandb_run_name = (
             datetime.now().strftime("%b%d_%H-%M-%S")
             + "_"
@@ -93,12 +94,13 @@ class OnPolicyRunner:
     def learn(self, num_learning_iterations, init_at_random_ep_len=False):
         # initialize writer
         if self.log_dir is not None and self.writer is None:
-            wandb.init(
-                project="XBot",
-                sync_tensorboard=True,
-                name=self.wandb_run_name,
-                config=self.all_cfg,
-            )
+            if self.use_wandb:
+                wandb.init(
+                    project="XBot",
+                    sync_tensorboard=True,
+                    name=self.wandb_run_name,
+                    config=self.all_cfg,
+                )
             self.writer = SummaryWriter(log_dir=self.log_dir, flush_secs=10)
         if init_at_random_ep_len:
             self.env.episode_length_buf = torch.randint_like(
@@ -210,6 +212,14 @@ class OnPolicyRunner:
         )
         self.writer.add_scalar("Loss/learning_rate", self.alg.learning_rate, locs["it"])
         self.writer.add_scalar("Policy/mean_noise_std", mean_std.item(), locs["it"])
+        # accuracy metrics derived from episode infos
+        if locs["ep_infos"]:
+            for key in ("tracking_lin_vel", "tracking_ang_vel", "feet_contact_number"):
+                vals = [ep[key] for ep in locs["ep_infos"] if key in ep]
+                if vals:
+                    import torch as _torch
+                    tensor = _torch.stack([v if isinstance(v, _torch.Tensor) else _torch.tensor([v]) for v in vals])
+                    self.writer.add_scalar(f"Accuracy/{key}", tensor.mean().item(), locs["it"])
         self.writer.add_scalar("Perf/total_fps", fps, locs["it"])
         self.writer.add_scalar(
             "Perf/collection time", locs["collection_time"], locs["it"]
