@@ -17,7 +17,7 @@ from scipy.spatial.transform import Rotation
 
 
 _LEGGED_GYM_ROOT = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), '..', '..', '..', '..')
+    os.path.join(os.path.dirname(__file__), '..', '..', '..')
 )
 
 ROBOT_CONFIGS = {
