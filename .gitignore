@@ -22,7 +22,10 @@ venv/
 
 # Training artifacts
 training_results_*/
+logs/sac/
+logs/*/
 *.pth
+*.pt
 *.ogv
 videos/
 
