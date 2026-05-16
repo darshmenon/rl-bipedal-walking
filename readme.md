@@ -1,4 +1,4 @@
-proepr# Humanoid RL — Bipedal Locomotion with Sim-to-Real Transfer
+# Humanoid RL — Bipedal Locomotion with Sim-to-Real Transfer
 
 A reinforcement learning framework for training bipedal humanoid robots to walk, combining **MuJoCo** simulation with **ROS 2 Humble** deployment pipelines. Trained policies transfer from simulation to real hardware via domain randomization and system identification.
 
@@ -100,6 +100,12 @@ pip install -r requirements.txt
 ```bash
 # PPO training with 4096 parallel environments
 python humanoid/scripts/train.py --task humanoid_ppo --run_name v1 --headless --num_envs 4096
+
+# Unitree H1 leg-only PPO task
+python humanoid/scripts/train.py --task h1_ppo --run_name h1_v1 --headless --num_envs 4096
+
+# Unitree H1 whole-body PPO task
+python humanoid/scripts/train.py --task h1_wholebody_ppo --run_name h1_body_v1 --headless --num_envs 4096
 ```
 
 Training runs with parallel environments. Policy checkpoints are saved to `logs/`.

@@ -38,5 +38,11 @@ from .custom.humanoid_env import XBotLFreeEnv
 
 from humanoid.utils.task_registry import task_registry
 
+from .custom.h1_config import H1Cfg, H1CfgPPO
+from .custom.h1_env import H1FreeEnv
+from .custom.h1_wholebody_config import H1WholeBodyCfg, H1WholeBodyCfgPPO
+from .custom.h1_wholebody_env import H1WholeBodyEnv
 
-task_registry.register( "humanoid_ppo", XBotLFreeEnv, XBotLCfg(), XBotLCfgPPO() )
+task_registry.register("humanoid_ppo",     XBotLFreeEnv,   XBotLCfg(),        XBotLCfgPPO())
+task_registry.register("h1_ppo",           H1FreeEnv,      H1Cfg(),            H1CfgPPO())
+task_registry.register("h1_wholebody_ppo", H1WholeBodyEnv, H1WholeBodyCfg(),   H1WholeBodyCfgPPO())
