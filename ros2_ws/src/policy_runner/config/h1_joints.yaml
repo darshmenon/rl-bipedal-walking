@@ -1,0 +1,42 @@
+policy_runner:
+  ros__parameters:
+    policy_path: ""
+
+    joint_names:
+      - left_hip_yaw_joint
+      - left_hip_roll_joint
+      - left_hip_pitch_joint
+      - left_knee_joint
+      - left_ankle_joint
+      - right_hip_yaw_joint
+      - right_hip_roll_joint
+      - right_hip_pitch_joint
+      - right_knee_joint
+      - right_ankle_joint
+
+    joint_command_topic: /position_controller/commands
+    policy_frequency: 100.0
+
+    obs_scale_lin_vel: 2.0
+    obs_scale_ang_vel: 1.0
+    obs_scale_dof_pos: 1.0
+    obs_scale_dof_vel: 0.05
+    obs_scale_quat:    1.0
+
+    frame_stack: 15
+    num_single_obs: 41
+
+    clip_obs:     18.0
+    clip_actions: 18.0
+
+    default_joint_pos:
+      - 0.0    # left_hip_yaw
+      - 0.0    # left_hip_roll
+      - -0.1   # left_hip_pitch
+      - 0.3    # left_knee
+      - -0.2   # left_ankle
+      - 0.0    # right_hip_yaw
+      - 0.0    # right_hip_roll
+      - -0.1   # right_hip_pitch
+      - 0.3    # right_knee
+      - -0.2   # right_ankle
