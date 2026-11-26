@@ -56,7 +56,7 @@ def test_alive_bonus_only_reward_stays_positive_near_stand(env):
 
 def test_episode_terminates_when_fallen(env):
     env.reset(seed=0)
-    env.data.qpos[2] = 0.1  # drop base below the fall threshold
+    env.data.qpos[2] = -0.5  # offset from base_link rest height (~0.88 m) -> world z ~0.38, below fall threshold
     action = np.zeros(12, dtype=np.float32)
     _, reward, terminated, _, _ = env.step(action)
     assert terminated
