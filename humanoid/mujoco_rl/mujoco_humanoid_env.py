@@ -43,6 +43,13 @@ CYCLE_TIME = 0.64
 BASE_HEIGHT_TARGET = 0.89
 FALL_HEIGHT = 0.5
 FALL_ROLL_PITCH = 0.65
+# Progress toward the commanded forward speed, on a velocity smoothed over about one
+# gait cycle so step-to-step oscillation is not penalised. Capped at the command (no pay
+# for overspeed), floored at -1. Off for near-zero commands.
+PROGRESS_WEIGHT = 1.0
+PROGRESS_DEADBAND = 0.05  # m/s
+PROGRESS_MIN_NORM = 0.1   # m/s, keeps small commands from being over-rewarded
+PROGRESS_TAU = CYCLE_TIME  # s, velocity filter time constant
 # Lateral CoM sway: shift weight toward the stance leg each half-cycle instead
 # of just penalizing lateral drift, mirroring the ZMP sway target in bheema's
 # com_traj.py (low-pass filtered so the target doesn't teleport at phase switches).
@@ -165,8 +172,19 @@ class MujocoHumanoidEnv(gym.Env):
         self.hist_obs = [np.zeros(NUM_SINGLE_OBS, dtype=np.float32) for _ in range(FRAME_STACK)]
         self.count = 0
         self.lateral_sway_target = 0.0
+        self.vx_filtered = 0.0
         obs = self._build_obs()
         return obs, {}
+
+    def _progress_reward(self, vx, dt):
+        alpha = 1.0 - math.exp(-dt / PROGRESS_TAU)
+        self.vx_filtered += alpha * (vx - self.vx_filtered)
+        cmd = abs(self.cmd_vx)
+        if cmd <= PROGRESS_DEADBAND:
+            return 0.0
+        norm = max(cmd, PROGRESS_MIN_NORM)
+        along = self.vx_filtered * math.copysign(1.0, self.cmd_vx)
+        return PROGRESS_WEIGHT * float(np.clip(along / norm, -1.0, cmd / norm))
 
     def step(self, action):
         action = np.clip(action, -self.clip_actions, self.clip_actions).astype(np.float64)
@@ -207,6 +225,7 @@ class MujocoHumanoidEnv(gym.Env):
         wobble_err = omega[0] ** 2 + omega[1] ** 2
         reward = 0.0
         reward += 1.2 * math.exp(-5.0 * forward_vel_err ** 2)
+        reward += self._progress_reward(base_vel[0], dt_ctrl)
         reward += 0.5 * math.exp(-8.0 * lateral_vel_err ** 2)
         reward += 0.6 * math.exp(-30.0 * lateral_pos_err ** 2)
         reward += 0.4 * math.exp(-6.0 * yaw_rate_err ** 2)
