@@ -36,6 +36,7 @@ from collections import deque
 from scipy.spatial.transform import Rotation as R
 from humanoid import LEGGED_GYM_ROOT_DIR
 from humanoid.envs import XBotLCfg
+from humanoid.mujoco_rl.mujoco_humanoid_env import LIMIT_PROFILES
 import torch
 
 
@@ -101,7 +102,10 @@ def run_mujoco(policy, cfg):
     # Match MujocoHumanoidEnv.reset(): the MJCF has no standing keyframe, so
     # without this the robot starts at qpos z=0 and immediately falls through
     # the floor before the policy gets a chance to act.
-    data.qpos[2] = 0.95
+    # qpos[2] is an offset from base_link's XML pos, so convert the 0.95 m world height.
+    mujoco.mj_forward(model, data)
+    base_bid = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, 'base_link')
+    data.qpos[2] = 0.95 - data.xpos[base_bid][2]
     data.qpos[3] = 1.0
     mujoco.mj_step(model, data)
     viewer = mujoco_viewer.MujocoViewer(model, data)
@@ -150,7 +154,7 @@ def run_mujoco(policy, cfg):
             for i in range(cfg.env.frame_stack):
                 policy_input[0, i * cfg.env.num_single_obs : (i + 1) * cfg.env.num_single_obs] = hist_obs[i][0, :]
             action[:] = policy(torch.tensor(policy_input))[0].detach().numpy()
-            action = np.clip(action, -cfg.normalization.clip_actions, cfg.normalization.clip_actions)
+            action = np.clip(action, -cfg.robot_config.clip_actions, cfg.robot_config.clip_actions)
 
             target_q = action * cfg.control.action_scale
 
@@ -169,19 +173,11 @@ def run_mujoco(policy, cfg):
     viewer.close()
 
 
-if __name__ == '__main__':
-    import argparse
-
-    parser = argparse.ArgumentParser(description='Deployment script.')
-    parser.add_argument('--load_model', type=str, required=True,
-                        help='Run to load from.')
-    parser.add_argument('--terrain', action='store_true', help='terrain or plane')
-    args = parser.parse_args()
-
+def make_cfg(terrain=False, limits='current'):
     class Sim2simCfg(XBotLCfg):
 
         class sim_config:
-            if args.terrain:
+            if terrain:
                 mujoco_model_path = f'{LEGGED_GYM_ROOT_DIR}/resources/robots/XBot/mjcf/XBot-L-terrain.xml'
             else:
                 mujoco_model_path = f'{LEGGED_GYM_ROOT_DIR}/resources/robots/XBot/mjcf/XBot-L.xml'
@@ -192,7 +188,22 @@ if __name__ == '__main__':
         class robot_config:
             kps = np.array([200, 200, 350, 350, 15, 15, 200, 200, 350, 350, 15, 15], dtype=np.double)
             kds = np.array([10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10], dtype=np.double)
-            tau_limit = 200. * np.ones(12, dtype=np.double)
+            tau_limit = LIMIT_PROFILES[limits]['tau_limit']
+            clip_actions = LIMIT_PROFILES[limits]['clip_actions']
+
+    return Sim2simCfg()
+
+
+if __name__ == '__main__':
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Deployment script.')
+    parser.add_argument('--load_model', type=str, required=True,
+                        help='Run to load from.')
+    parser.add_argument('--terrain', action='store_true', help='terrain or plane')
+    parser.add_argument('--limits', choices=list(LIMIT_PROFILES), default='current',
+                        help="use 'legacy' for policies trained with clip 18 / torque 200")
+    args = parser.parse_args()
 
     policy = torch.jit.load(args.load_model)
-    run_mujoco(policy, Sim2simCfg())
+    run_mujoco(policy, make_cfg(args.terrain, args.limits))

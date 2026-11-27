@@ -26,9 +26,18 @@ JOINT_NAMES = [
 
 KP = np.array([200, 200, 350, 350, 15, 15, 200, 200, 350, 350, 15, 15], dtype=np.float64)
 KD = np.array([10] * 12, dtype=np.float64)
-TAU_LIMIT = 200.0
+# Order = JOINT_NAMES (hip roll/yaw/pitch, knee, ankle pitch/roll). XBot-L.urdf effort
+# limits scaled by 0.85 (safety.torque_limit), matching the Isaac Gym config.
+TAU_LIMIT = 0.85 * np.array([100, 100, 250, 250, 100, 100] * 2, dtype=np.float64)
 ACTION_SCALE = 0.25
-CLIP_ACTIONS = 18.0
+CLIP_ACTIONS = 5.0  # was 18 (PD target up to 4.5 rad); 5*ACTION_SCALE = 1.25 rad
+# Action/torque limits shared by training and sim2sim. 'legacy' is for checkpoints
+# trained before the per-joint limits (e.g. to evaluate or resume them).
+LIMIT_PROFILES = {
+    'current': dict(tau_limit=TAU_LIMIT, clip_actions=CLIP_ACTIONS),
+    'legacy': dict(tau_limit=np.full(12, 200.0), clip_actions=18.0),
+}
+CMD_VX_RANGE = (-0.3, 0.6)  # matches humanoid_config.commands.ranges.lin_vel_x
 CLIP_OBS = 18.0
 CYCLE_TIME = 0.64
 BASE_HEIGHT_TARGET = 0.89
@@ -64,7 +73,7 @@ class MujocoHumanoidEnv(gym.Env):
     metadata = {"render_modes": ["human"], "render_fps": 100}
 
     def __init__(self, xml_path, render_mode=None, sim_dt=0.001, decimation=10,
-                 episode_length_s=24.0, cmd_vx=0.4, cmd_vy=0.0, cmd_dyaw=0.0):
+                 episode_length_s=24.0, cmd_vx=0.4, cmd_vy=0.0, cmd_dyaw=0.0, randomize_cmd=False, limits='current'):
         super().__init__()
         self.model = mujoco.MjModel.from_xml_path(xml_path)
         self.model.opt.timestep = sim_dt
@@ -76,6 +85,9 @@ class MujocoHumanoidEnv(gym.Env):
         self.viewer = None
 
         self.cmd_vx, self.cmd_vy, self.cmd_dyaw = cmd_vx, cmd_vy, cmd_dyaw
+        self.randomize_cmd = randomize_cmd
+        self.tau_limit = LIMIT_PROFILES[limits]['tau_limit']
+        self.clip_actions = LIMIT_PROFILES[limits]['clip_actions']
 
         self.joint_qpos_adr = np.array(
             [self.model.jnt_qposadr[mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_JOINT, n)]
@@ -85,7 +97,7 @@ class MujocoHumanoidEnv(gym.Env):
              for n in JOINT_NAMES])
 
         self.action_space = spaces.Box(
-            low=-CLIP_ACTIONS, high=CLIP_ACTIONS, shape=(12,), dtype=np.float32)
+            low=-self.clip_actions, high=self.clip_actions, shape=(12,), dtype=np.float32)
         self.observation_space = spaces.Box(
             low=-CLIP_OBS, high=CLIP_OBS, shape=(NUM_OBS,), dtype=np.float32)
 
@@ -147,6 +159,8 @@ class MujocoHumanoidEnv(gym.Env):
             self.data.qpos[adr] = 0.0 + self.np_random.uniform(-0.02, 0.02)
         mujoco.mj_forward(self.model, self.data)
 
+        if self.randomize_cmd:
+            self.cmd_vx = float(self.np_random.uniform(*CMD_VX_RANGE))
         self.prev_action = np.zeros(12, dtype=np.float32)
         self.hist_obs = [np.zeros(NUM_SINGLE_OBS, dtype=np.float32) for _ in range(FRAME_STACK)]
         self.count = 0
@@ -155,14 +169,15 @@ class MujocoHumanoidEnv(gym.Env):
         return obs, {}
 
     def step(self, action):
-        action = np.clip(action, -CLIP_ACTIONS, CLIP_ACTIONS).astype(np.float64)
+        action = np.clip(action, -self.clip_actions, self.clip_actions).astype(np.float64)
         target_q = action * ACTION_SCALE
 
         for _ in range(self.decimation):
             q = self.data.qpos[self.joint_qpos_adr]
             dq = self.data.qvel[self.joint_qvel_adr]
             tau = (target_q - q) * KP + (0.0 - dq) * KD
-            tau = np.clip(tau, -TAU_LIMIT, TAU_LIMIT)
+            tau_demand = tau
+            tau = np.clip(tau, -self.tau_limit, self.tau_limit)
             self.data.ctrl[:] = tau
             mujoco.mj_step(self.model, self.data)
 
@@ -198,7 +213,7 @@ class MujocoHumanoidEnv(gym.Env):
         reward += 1.4 * math.exp(-12.0 * tilt_err)
         reward += 0.4 * math.exp(-2.0 * wobble_err)
         reward += 0.2 * math.exp(-20.0 * (base_z - BASE_HEIGHT_TARGET) ** 2)
-        reward -= 1e-5 * float(np.sum(np.square(self.data.ctrl)))
+        reward -= 1e-5 * float(np.sum(np.square(tau_demand)))  # unclipped PD demand (last substep)
         reward -= 0.002 * float(np.sum(np.square(action - self.prev_action)))
         reward += 0.5  # alive bonus
 

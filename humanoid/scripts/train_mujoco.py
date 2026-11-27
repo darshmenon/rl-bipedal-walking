@@ -25,20 +25,64 @@ import sys
 # lightweight event writer instead, which sidesteps the crash entirely.
 sys.modules['tensorflow'] = None
 
+import numpy as np
 import torch
 import torch.nn as nn
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv
 from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.callbacks import CheckpointCallback
+from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
+import glob
+import signal
+import time
 
 from humanoid import LEGGED_GYM_ROOT_DIR
-from humanoid.mujoco_rl.mujoco_humanoid_env import MujocoHumanoidEnv, NUM_OBS
+from humanoid.mujoco_rl.mujoco_humanoid_env import MujocoHumanoidEnv, NUM_OBS, LIMIT_PROFILES
 
 
-def make_env(xml_path):
+class ProgressCallback(BaseCallback):
+    """Unattended-run helper: periodic progress line, best-model save, checkpoint
+    pruning (keep newest N), and a clean stop on SIGTERM/SIGINT."""
+
+    def __init__(self, log_dir, keep=3, every_s=180):
+        super().__init__()
+        self.log_dir, self.keep, self.every_s = log_dir, keep, every_s
+        self.last = 0.0
+        self.best = -float('inf')
+        self.stop = False
+        signal.signal(signal.SIGTERM, self._sig)
+        signal.signal(signal.SIGINT, self._sig)
+
+    def _sig(self, *_):
+        self.stop = True
+
+    def _on_training_end(self):
+        self._log(final=True)
+
+    def _on_step(self):
+        now = time.time()
+        if now - self.last >= self.every_s:
+            self.last = now
+            self._log()
+        return not self.stop
+
+    def _log(self, final=False):
+        buf = self.model.ep_info_buffer
+        rew = float(np.mean([e['r'] for e in buf])) if buf else float('nan')
+        ln = float(np.mean([e['l'] for e in buf])) if buf else float('nan')
+        with open(f'{self.log_dir}/progress.log', 'a') as f:
+            f.write(f'{time.strftime("%F %T")} steps={self.num_timesteps} ep_rew={rew:.1f} ep_len={ln:.0f}\n')
+        if buf and len(buf) >= 20 and rew > self.best:
+            self.best = rew
+            self.model.save(f'{self.log_dir}/best_model')
+        ckpts = sorted(glob.glob(f'{self.log_dir}/checkpoints/*.zip'), key=os.path.getmtime)
+        for old in ckpts[:-self.keep]:
+            os.remove(old)
+
+
+def make_env(xml_path, randomize_cmd=False, limits='current'):
     def _init():
-        return Monitor(MujocoHumanoidEnv(xml_path))
+        return Monitor(MujocoHumanoidEnv(xml_path, randomize_cmd=randomize_cmd, limits=limits))
     return _init
 
 
@@ -62,6 +106,9 @@ def main():
     parser.add_argument('--num_envs', type=int, default=8)
     parser.add_argument('--total_timesteps', type=int, default=2_000_000)
     parser.add_argument('--terrain', action='store_true')
+    parser.add_argument('--randomize_cmd', action='store_true', help='resample cmd_vx each episode')
+    parser.add_argument('--limits', choices=list(LIMIT_PROFILES), default='current',
+                        help="use 'legacy' to resume checkpoints trained with clip 18 / torque 200")
     parser.add_argument('--resume', type=str, default=None, help='path to a .zip checkpoint to resume from')
     args = parser.parse_args()
 
@@ -72,7 +119,7 @@ def main():
     os.makedirs(log_dir, exist_ok=True)
 
     vec_cls = SubprocVecEnv if args.num_envs > 1 else DummyVecEnv
-    env = vec_cls([make_env(xml_path) for _ in range(args.num_envs)])
+    env = vec_cls([make_env(xml_path, args.randomize_cmd, args.limits) for _ in range(args.num_envs)])
 
     policy_kwargs = dict(net_arch=dict(pi=[512, 256, 128], vf=[768, 256, 128]))
 
@@ -106,7 +153,9 @@ def main():
         name_prefix='ppo_xbot',
     )
 
-    model.learn(total_timesteps=args.total_timesteps, callback=checkpoint_cb, progress_bar=True)
+    progress_cb = ProgressCallback(log_dir)
+    model.learn(total_timesteps=args.total_timesteps, callback=[checkpoint_cb, progress_cb], progress_bar=False)
+    model.save(f'{log_dir}/final_model')
 
     export_dir = f'{log_dir}/exported/policies'
     os.makedirs(export_dir, exist_ok=True)
