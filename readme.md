@@ -27,7 +27,6 @@ This project implements end-to-end reinforcement learning for humanoid locomotio
 rl-bipedal-walking/
 ├── humanoid_descriptions/           # Vendored humanoid robot sources
 │   ├── ros/                         # ROS/Gazebo-oriented packages
-│   ├── rl/                          # RL training stacks from official sources
 │   └── urdf_only/                   # Description-focused robot packages
 ├── humanoid/                         # RL training package
 │   ├── envs/
@@ -35,8 +34,10 @@ rl-bipedal-walking/
 │   │   └── custom/
 │   │       ├── humanoid_env.py       # Humanoid env (rewards, obs, domain rand)
 │   │       └── humanoid_config.py    # Training & environment hyperparameters
+│   ├── mujoco_rl/                    # Isaac-Gym-free MuJoCo env (XBot-L) for SB3 PPO
 │   ├── scripts/
-│   │   ├── train.py                  # Launch RL training
+│   │   ├── train.py                  # Launch RL training (Isaac Gym)
+│   │   ├── train_mujoco.py           # MuJoCo + stable-baselines3 PPO training
 │   │   ├── play.py                   # Visualize & export trained policy
 │   │   └── sim2sim.py                # MuJoCo sim-to-sim validation
 │   ├── algo/                         # PPO implementation
