@@ -36,6 +36,9 @@ import glob
 import signal
 import time
 
+# Make the repo importable when run as a script, without PYTHONPATH or an install.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
 from humanoid import LEGGED_GYM_ROOT_DIR
 from humanoid.mujoco_rl.mujoco_humanoid_env import MujocoHumanoidEnv, NUM_OBS, LIMIT_PROFILES
 
