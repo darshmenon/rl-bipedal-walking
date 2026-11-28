@@ -32,8 +32,16 @@ def test_overspeed_is_not_paid_extra(env):
     assert terms(env, 0.06, np.full(1000, 1.0)).max() == pytest.approx(0.6)
 
 
-def test_backward_motion_is_floored(env):
-    assert terms(env, 0.1, np.full(1000, -2.0)).min() == pytest.approx(-1.0)
+@pytest.mark.parametrize('period', [3.2, 6.4, 12.8])
+@pytest.mark.parametrize('forward_fraction', [0.75, 0.9])
+def test_slow_rocking_in_place_is_not_paid(env, period, forward_fraction):
+    cmd = 0.1
+    back = cmd * forward_fraction / (1.0 - forward_fraction)
+    n = round(period / DT)
+    t = np.arange(20 * n) % n
+    v = np.where(t < round(forward_fraction * n), cmd, -back)
+    assert v.mean() == pytest.approx(0.0, abs=1e-9)
+    assert terms(env, cmd, v)[10 * n:].mean() <= 1e-6
 
 
 def test_off_inside_deadband(env):

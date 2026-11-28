@@ -45,7 +45,8 @@ FALL_HEIGHT = 0.5
 FALL_ROLL_PITCH = 0.65
 # Progress toward the commanded forward speed, on a velocity smoothed over about one
 # gait cycle so step-to-step oscillation is not penalised. Capped at the command (no pay
-# for overspeed), floored at -1. Off for near-zero commands.
+# for overspeed). No lower floor: a floor would pay for slow rocking in place. Off for
+# near-zero commands.
 PROGRESS_WEIGHT = 1.0
 PROGRESS_DEADBAND = 0.05  # m/s
 PROGRESS_MIN_NORM = 0.1   # m/s, keeps small commands from being over-rewarded
@@ -184,7 +185,7 @@ class MujocoHumanoidEnv(gym.Env):
             return 0.0
         norm = max(cmd, PROGRESS_MIN_NORM)
         along = self.vx_filtered * math.copysign(1.0, self.cmd_vx)
-        return PROGRESS_WEIGHT * float(np.clip(along / norm, -1.0, cmd / norm))
+        return PROGRESS_WEIGHT * float(min(along, cmd) / norm)
 
     def step(self, action):
         action = np.clip(action, -self.clip_actions, self.clip_actions).astype(np.float64)
